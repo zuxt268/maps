@@ -1,22 +1,106 @@
-chrome.storage.sync.get(["enabled", "name", "email", "apiKey"], (data) => {
+chrome.storage.sync.get(["enabled", "name", "email", "phone", "apiKey"], (data) => {
     if (data.enabled) {
-        const d = `${data.email} ${data.name} ${data.apiKey}`;
-        window.alert(d);
+        // ローディング表示
+        showLoading();
 
         // クラスを利用する例
-        const browser = new Browser(data.name, data.email);
-        browser.fillForm();
+        const browser = new Browser(data.name, data.email, data.phone);
+        browser.fillForm(() => {
+            // フォーム入力完了後、ローディングを非表示
+            hideLoading();
+        });
     }
 });
 
+// ローディング表示関数
+function showLoading() {
+    // 既存のローディングがあれば削除
+    const existingLoader = document.getElementById('form-filler-loader');
+    if (existingLoader) {
+        existingLoader.remove();
+    }
+
+    // ローディングオーバーレイを作成
+    const overlay = document.createElement('div');
+    overlay.id = 'form-filler-loader';
+    overlay.innerHTML = `
+        <div class="overlay">
+            <div class="spinner-container">
+                <div class="spinner"></div>
+                <div class="loading-text">フォームに自動入力中...</div>
+            </div>
+        </div>
+    `;
+
+    // スタイルを追加
+    overlay.innerHTML += `
+        <style>
+            #form-filler-loader .overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.6);
+                z-index: 10000;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            #form-filler-loader .spinner-container {
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+                text-align: center;
+            }
+
+            #form-filler-loader .spinner {
+                width: 50px;
+                height: 50px;
+                border: 5px solid #f3f3f3;
+                border-top: 5px solid #4CAF50;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            }
+
+            #form-filler-loader .loading-text {
+                font-size: 16px;
+                color: #333;
+                font-weight: 500;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+// ローディング非表示関数
+function hideLoading() {
+    const loader = document.getElementById('form-filler-loader');
+    if (loader) {
+        loader.remove();
+    }
+}
+
 class Browser {
-    constructor(name, email) {
+    constructor(name, email, phone) {
         this.name = name;
         this.email = email;
+        this.phone = phone;
     }
 
     // ページ上の問い合わせフォームに入力
-    fillForm() {
+    fillForm(callback) {
+        this.callback = callback;
         // 最初にページを下までスクロールしてReactコンポーネントを全て読み込む
         console.log('Scrolling to bottom to load all components...');
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -85,7 +169,7 @@ class Browser {
             input[aria-label*='Phone']
         `);
         if (phoneInput) {
-            phoneInput.value = "090-1234-5678";
+            phoneInput.value = this.phone || "090-1234-5678";
             phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
             phoneInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -145,6 +229,14 @@ class Browser {
 
         } else {
             console.log('No message input found');
+        }
+
+        // フォーム入力完了後、コールバックを呼び出し
+        if (this.callback) {
+            console.log('Form filling completed, calling callback...');
+            setTimeout(() => {
+                this.callback();
+            }, 1000); // 1秒後にコールバック実行
         }
     }
 }
